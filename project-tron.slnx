@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Tron.Alerting/Tron.Alerting.csproj" />
+    <Project Path="src/Tron.Core/Tron.Core.csproj" />
+    <Project Path="src/Tron.Monitors/Tron.Monitors.csproj" />
+    <Project Path="src/Tron.Service/Tron.Service.csproj" />
+  </Folder>
+</Solution>

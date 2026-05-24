@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-Tron.Service-725f58be-16a7-49d3-b0e2-b7380ac7b811</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.8" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Tron.Core\Tron.Core.csproj" />
+    <ProjectReference Include="..\Tron.Monitors\Tron.Monitors.csproj" />
+    <ProjectReference Include="..\Tron.Alerting\Tron.Alerting.csproj" />
+  </ItemGroup>
+</Project>
