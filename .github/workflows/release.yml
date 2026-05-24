@@ -1,0 +1,130 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: build (${{ matrix.rid }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - rid: win-x64
+            os: windows-latest
+            binary: Tron.Service.exe
+          - rid: linux-x64
+            os: ubuntu-latest
+            binary: Tron.Service
+          - rid: linux-arm64
+            os: ubuntu-latest
+            binary: Tron.Service
+          - rid: osx-arm64
+            os: macos-latest
+            binary: Tron.Service
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.x'
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Publish (${{ matrix.rid }})
+        run: |
+          dotnet publish src/Tron.Service/Tron.Service.csproj \
+            -c Release \
+            -r ${{ matrix.rid }} \
+            --self-contained true \
+            -p:PublishSingleFile=true \
+            -p:EnableCompressionInSingleFile=true \
+            -p:AssemblyVersion=${{ github.ref_name }} \
+            -p:FileVersion=${{ github.ref_name }} \
+            -o build/dist/${{ matrix.rid }}
+        shell: bash
+
+      - name: Package (zip)
+        run: |
+          version="${{ github.ref_name }}"
+          rid="${{ matrix.rid }}"
+          staging="build/dist/${rid}"
+          zipname="tron-${version}-${rid}.zip"
+
+          # Set executable bit on Unix binaries before zipping
+          if [[ -f "$staging/Tron.Service" ]]; then
+            chmod +x "$staging/Tron.Service"
+          fi
+
+          # Include install script for Linux
+          if [[ "$rid" == linux* ]]; then
+            mkdir -p "$staging/build/linux"
+            cp build/linux/install.sh "$staging/build/linux/install.sh"
+            chmod +x "$staging/build/linux/install.sh"
+          fi
+
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            powershell -Command "Compress-Archive -Path '${staging}/*' -DestinationPath 'build/dist/${zipname}'"
+          else
+            (cd "$staging" && zip -r "../../$zipname" .)
+          fi
+
+          echo "ASSET_PATH=build/dist/$zipname" >> "$GITHUB_ENV"
+          echo "ASSET_NAME=$zipname" >> "$GITHUB_ENV"
+        shell: bash
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ASSET_NAME }}
+          path: ${{ env.ASSET_PATH }}
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Tron ${{ github.ref_name }}
+          draft: true
+          body: |
+            ## Tron ${{ github.ref_name }}
+
+            > ⚠️ **Codename release** — production name TBD
+
+            ### Downloads
+
+            | Platform | File |
+            |---|---|
+            | Windows (x64) | `tron-*-win-x64.zip` |
+            | Linux (x64) | `tron-*-linux-x64.zip` |
+            | Linux (arm64) | `tron-*-linux-arm64.zip` |
+            | macOS (Apple Silicon) | `tron-*-osx-arm64.zip` |
+
+            ### Quick start (Linux)
+            ```bash
+            unzip tron-*-linux-x64.zip -d tron
+            sudo bash tron/build/linux/install.sh tron/Tron.Service
+            ```
+
+            ### Configuration
+            Edit `/opt/tron/appsettings.json` to add your Discord webhook and watched services.
+
+            **Full Changelog:** https://github.com/${{ github.repository }}/compare/.../${{ github.ref_name }}
+          files: artifacts/*

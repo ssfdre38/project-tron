@@ -9,6 +9,7 @@ public record SystemSnapshot
     public List<NetworkMetrics> Network { get; init; } = [];
     public List<ServiceStatus> Services { get; init; } = [];
     public List<ProcessInfo> TopProcesses { get; init; } = [];
+    public List<NetworkConnection> Connections { get; init; } = [];
     public List<SecurityEvent> RecentSecurityEvents { get; init; } = [];
 }
 
@@ -55,9 +56,25 @@ public record ProcessInfo
 {
     public int Pid { get; init; }
     public string Name { get; init; } = "";
+    public string ExecutablePath { get; init; } = "";
+    public string CommandLine { get; init; } = "";
     public float CpuPercent { get; init; }
     public long MemoryBytes { get; init; }
     public bool IsWatched { get; init; }
+    public bool IsNewlyObserved { get; init; }
+    public DateTimeOffset StartTime { get; init; }
+}
+
+public record NetworkConnection
+{
+    public string Protocol { get; init; } = "";
+    public string LocalAddress { get; init; } = "";
+    public int LocalPort { get; init; }
+    public string RemoteAddress { get; init; } = "";
+    public int RemotePort { get; init; }
+    public string State { get; init; } = "";
+    public int OwningPid { get; init; }
+    public string OwningProcess { get; init; } = "";
 }
 
 public record SecurityEvent

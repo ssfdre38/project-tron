@@ -11,51 +11,86 @@ public sealed class TronWorker : BackgroundService
     private readonly IMetricsCollector _collector;
     private readonly IEnumerable<IMonitor> _monitors;
     private readonly IEnumerable<IAlertSink> _sinks;
+    private readonly IAiAnalyzer _analyzer;
     private readonly TronOptions _opts;
     private readonly ILogger<TronWorker> _log;
 
-    // Deduplicate alerts — don't re-fire the same alert title within the cooldown window
     private readonly Dictionary<string, DateTimeOffset> _lastAlerted = [];
-    private static readonly TimeSpan AlertCooldown = TimeSpan.FromMinutes(15);
+    private TimeSpan AlertCooldown => TimeSpan.FromMinutes(_opts.Alerting.CooldownMinutes);
 
     public TronWorker(
         IMetricsCollector collector,
         IEnumerable<IMonitor> monitors,
         IEnumerable<IAlertSink> sinks,
+        IAiAnalyzer analyzer,
         IOptions<TronOptions> opts,
         ILogger<TronWorker> log)
     {
         _collector = collector;
         _monitors = monitors;
         _sinks = sinks;
+        _analyzer = analyzer;
         _opts = opts.Value;
         _log = log;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _log.LogInformation("Tron is online — watching the system.");
+        _log.LogInformation("Tron is online — watching the system. AI analysis: {AiStatus}",
+            _analyzer.IsAvailable ? $"enabled ({_opts.Ai.Model})" : "disabled");
 
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
                 var snapshot = await _collector.CollectAsync(stoppingToken);
-                _log.LogDebug("Snapshot collected: CPU={Cpu:F1}% MEM={Mem:F1}%",
-                    snapshot.Cpu.UsagePercent, snapshot.Memory.UsagePercent);
+                _log.LogDebug("Snapshot: CPU={Cpu:F1}% MEM={Mem:F1}% Connections={Conns}",
+                    snapshot.Cpu.UsagePercent, snapshot.Memory.UsagePercent, snapshot.Connections.Count);
+
+                var allAlerts = new List<Alert>();
 
                 foreach (var monitor in _monitors)
                 {
-                    IEnumerable<Alert> alerts;
-                    try { alerts = await monitor.CheckAsync(snapshot, stoppingToken); }
+                    try
+                    {
+                        var alerts = await monitor.CheckAsync(snapshot, stoppingToken);
+                        allAlerts.AddRange(alerts);
+                    }
                     catch (Exception ex)
                     {
                         _log.LogWarning(ex, "Monitor {Name} threw an exception", monitor.Name);
-                        continue;
                     }
+                }
 
-                    foreach (var alert in alerts)
-                        await DispatchAlertAsync(alert, stoppingToken);
+                // Run AI analysis on the batch if there are any significant alerts
+                var significantAlerts = allAlerts
+                    .Where(a => a.Severity >= AlertSeverity.Warning)
+                    .ToList();
+
+                string? aiAnalysis = null;
+                if (significantAlerts.Count > 0 && _analyzer.IsAvailable)
+                {
+                    aiAnalysis = await _analyzer.AnalyzeAsync(significantAlerts, snapshot, stoppingToken);
+                }
+
+                foreach (var alert in allAlerts)
+                    await DispatchAlertAsync(alert, stoppingToken);
+
+                // Send AI analysis as a follow-up embed if present
+                if (!string.IsNullOrWhiteSpace(aiAnalysis))
+                {
+                    var analysisAlert = new Alert
+                    {
+                        Severity = AlertSeverity.Info,
+                        Category = AlertCategory.Agent,
+                        Title = "🤖 Tron Analysis",
+                        Message = aiAnalysis
+                    };
+                    foreach (var sink in _sinks)
+                    {
+                        try { await sink.SendAsync(analysisAlert, stoppingToken); }
+                        catch (Exception ex) { _log.LogError(ex, "Sink {Sink} failed for AI analysis", sink.GetType().Name); }
+                    }
                 }
             }
             catch (OperationCanceledException) { break; }

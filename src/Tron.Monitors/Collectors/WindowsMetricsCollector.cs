@@ -38,6 +38,7 @@ public sealed class WindowsMetricsCollector : IMetricsCollector, IDisposable
         var network = CollectNetwork();
         var services = await CollectServicesAsync(ct);
         var processes = CollectTopProcesses();
+        var connections = await CollectConnectionsAsync(ct);
         var secEvents = CollectSecurityEvents();
 
         return new SystemSnapshot
@@ -48,6 +49,7 @@ public sealed class WindowsMetricsCollector : IMetricsCollector, IDisposable
             Network = network,
             Services = services,
             TopProcesses = processes,
+            Connections = connections,
             RecentSecurityEvents = secEvents
         };
     }
@@ -167,14 +169,27 @@ public sealed class WindowsMetricsCollector : IMetricsCollector, IDisposable
         }, ct);
     }
 
-    private static List<ProcessInfo> CollectTopProcesses(int top = 10)
+    private static List<ProcessInfo> CollectTopProcesses(int top = 20)
     {
         try
         {
             return Process.GetProcesses()
                 .Select(p =>
                 {
-                    try { return new ProcessInfo { Pid = p.Id, Name = p.ProcessName, MemoryBytes = p.WorkingSet64 }; }
+                    try
+                    {
+                        var path = "";
+                        var cmdLine = "";
+                        try { path = p.MainModule?.FileName ?? ""; } catch { }
+                        return new ProcessInfo
+                        {
+                            Pid = p.Id,
+                            Name = p.ProcessName,
+                            ExecutablePath = path,
+                            MemoryBytes = p.WorkingSet64,
+                            StartTime = p.StartTime.ToUniversalTime()
+                        };
+                    }
                     catch { return null; }
                 })
                 .Where(p => p != null)
@@ -185,6 +200,55 @@ public sealed class WindowsMetricsCollector : IMetricsCollector, IDisposable
         }
         catch { return []; }
     }
+
+    private static Task<List<NetworkConnection>> CollectConnectionsAsync(CancellationToken ct)
+    {
+        return Task.Run(() =>
+        {
+            var results = new List<NetworkConnection>();
+            try
+            {
+                // Use netstat via WMI MSFT_NetTCPConnection for richer data
+                using var searcher = new ManagementObjectSearcher(
+                    @"root\StandardCimv2",
+                    "SELECT LocalAddress, LocalPort, RemoteAddress, RemotePort, State, OwningProcess FROM MSFT_NetTCPConnection");
+
+                // Build PID->ProcessName lookup
+                var pidNames = Process.GetProcesses()
+                    .ToDictionary(p => p.Id, p => { try { return p.ProcessName; } catch { return "?"; } });
+
+                foreach (ManagementObject obj in searcher.Get())
+                {
+                    var pid = Convert.ToInt32(obj["OwningProcess"]);
+                    var stateVal = Convert.ToInt32(obj["State"]);
+                    results.Add(new NetworkConnection
+                    {
+                        Protocol = "TCP",
+                        LocalAddress = obj["LocalAddress"]?.ToString() ?? "",
+                        LocalPort = Convert.ToInt32(obj["LocalPort"]),
+                        RemoteAddress = obj["RemoteAddress"]?.ToString() ?? "",
+                        RemotePort = Convert.ToInt32(obj["RemotePort"]),
+                        State = TcpStateToString(stateVal),
+                        OwningPid = pid,
+                        OwningProcess = pidNames.TryGetValue(pid, out var name) ? name : "?"
+                    });
+                }
+            }
+            catch
+            {
+                // MSFT_NetTCPConnection may not be available on all Windows versions — fall back to no connections
+            }
+            return results;
+        }, ct);
+    }
+
+    private static string TcpStateToString(int state) => state switch
+    {
+        1 => "CLOSED", 2 => "LISTEN", 3 => "SYN_SENT", 4 => "SYN_RECEIVED",
+        5 => "ESTABLISHED", 6 => "FIN_WAIT1", 7 => "FIN_WAIT2", 8 => "CLOSE_WAIT",
+        9 => "CLOSING", 10 => "LAST_ACK", 11 => "TIME_WAIT", 12 => "DELETE_TCB",
+        _ => "UNKNOWN"
+    };
 
     private static List<SecurityEvent> CollectSecurityEvents(int maxEvents = 20)
     {
