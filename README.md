@@ -1,6 +1,15 @@
 # Project Tron — AI-native system guardian
 
+> *"I fight for the Users."*
+> — Tron, [TRON (1982)](https://www.imdb.com/title/tt0084827/quotes/?item=qt0432721)
+
 > **Codename**: Project Tron | **Production name**: TBD
+
+> **Disclaimer**: TRON is a trademark and copyright of The Walt Disney Company.
+> Project Tron is an independent open-source project inspired by the character Tron
+> from the 1982 Disney film *TRON* — a security program whose sole purpose was to
+> monitor communications, fight threats, and protect the system on behalf of its Users.
+> This project is not affiliated with, endorsed by, or sponsored by Disney in any way.
 
 An AI-native, next-generation security and monitoring daemon for Windows Server.
 Watches everything — OS resources, services, processes, network connections,
