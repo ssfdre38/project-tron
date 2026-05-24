@@ -1,4 +1,3 @@
-using Microsoft.Extensions.Hosting.WindowsServices;
 using Tron.Alerting.Analyzers;
 using Tron.Alerting.Sinks;
 using Tron.Core.Config;
@@ -10,15 +9,23 @@ using Tron.Service;
 
 var builder = Host.CreateApplicationBuilder(args);
 
-// Windows Service support — runs as a service OR as a console app
-if (OperatingSystem.IsWindows())
-    builder.Services.AddWindowsService(opts => opts.ServiceName = "Tron");
+// Windows Service support — runs as a service OR as a console app on Windows
+#if TRON_WINDOWS
+builder.Services.AddWindowsService(opts => opts.ServiceName = "Tron");
+#else
+// Linux: integrate with systemd (notify-ready, watchdog, journal logging)
+builder.Services.AddSystemd();
+#endif
 
 // Config
 builder.Services.Configure<TronOptions>(builder.Configuration.GetSection(TronOptions.Section));
 
-// Metrics collector
+// Metrics collector — platform-selected at compile time
+#if TRON_WINDOWS
 builder.Services.AddSingleton<IMetricsCollector, WindowsMetricsCollector>();
+#else
+builder.Services.AddSingleton<IMetricsCollector, UnixMetricsCollector>();
+#endif
 
 // Baseline persistence
 builder.Services.AddSingleton<IBaselineRepository, JsonBaselineRepository>();

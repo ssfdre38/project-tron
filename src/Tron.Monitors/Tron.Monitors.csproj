@@ -1,5 +1,10 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
+  <!-- Platform define — used by #if TRON_WINDOWS guards -->
+  <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+    <DefineConstants>$(DefineConstants);TRON_WINDOWS</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Tron.Core\Tron.Core.csproj" />
   </ItemGroup>
@@ -7,9 +12,18 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.8" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.8" />
+  </ItemGroup>
+
+  <!-- Windows-only packages — only referenced when building on/for Windows -->
+  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
     <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="10.0.8" />
     <PackageReference Include="System.Management" Version="10.0.8" />
     <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.8" />
+  </ItemGroup>
+
+  <!-- Exclude Windows-only collector when building on non-Windows hosts -->
+  <ItemGroup Condition="!$([MSBuild]::IsOSPlatform('Windows'))">
+    <Compile Remove="Collectors/WindowsMetricsCollector.cs" />
   </ItemGroup>
 
   <PropertyGroup>

@@ -62,7 +62,7 @@ public record ProcessInfo
     public long MemoryBytes { get; init; }
     public bool IsWatched { get; init; }
     public bool IsNewlyObserved { get; init; }
-    public DateTimeOffset StartTime { get; init; }
+    public DateTimeOffset? StartTime { get; init; }
 }
 
 public record NetworkConnection

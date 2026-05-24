@@ -14,14 +14,21 @@ public sealed class ServiceMonitor : IMonitor
             .Where(s => s.IsWatched && s.Status != "Running")
             .Select(s => new Alert
             {
-                Severity = AlertSeverity.Critical,
-                Category = AlertCategory.Service,
-                Title = $"Service Down: {s.DisplayName}",
-                Message = $"Watched service '{s.Name}' ({s.DisplayName}) is in state: {s.Status}.",
-                SuggestedAction = $"Restart the service: sc start {s.Name}",
+                Severity        = AlertSeverity.Critical,
+                Category        = AlertCategory.Service,
+                Title           = $"Service Down: {s.DisplayName}",
+                Message         = $"Watched service '{s.Name}' ({s.DisplayName}) is in state: {s.Status}.",
+                SuggestedAction = RestartCommand(s.Name),
                 RequiresApproval = true
             });
 
         return Task.FromResult<IEnumerable<Alert>>(alerts);
+    }
+
+    private static string RestartCommand(string name)
+    {
+        if (OperatingSystem.IsWindows()) return $"Run: sc start {name}";
+        if (OperatingSystem.IsMacOS())   return $"Run: launchctl start {name}";
+        return $"Run: systemctl start {name}";
     }
 }

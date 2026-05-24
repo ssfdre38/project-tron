@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Management;
+using System.Runtime.Versioning;
 using System.ServiceProcess;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;using Tron.Core.Config;
@@ -9,6 +10,7 @@ using Tron.Core.Models;
 namespace Tron.Monitors.Collectors;
 
 /// <summary>Collects a full system snapshot using Windows Performance Counters + WMI + SCM.</summary>
+[SupportedOSPlatform("windows")]
 public sealed class WindowsMetricsCollector : IMetricsCollector, IDisposable
 {
     private readonly TronOptions _opts;
@@ -18,8 +20,8 @@ public sealed class WindowsMetricsCollector : IMetricsCollector, IDisposable
     private readonly Dictionary<string, PerformanceCounter[]> _diskCounters = [];
     private readonly Dictionary<string, PerformanceCounter[]> _netCounters = [];
 
-    // Security event IDs worth tracking
-    private static readonly int[] WatchedEventIds = [4625, 4648, 4719, 4728, 4732, 4756, 4776, 7045];
+    // Security event IDs worth tracking (use int for InstanceId comparison)
+    private static readonly HashSet<int> WatchedEventIds = new() { 4625, 4648, 4719, 4728, 4732, 4756, 4776, 7045 };
 
     public WindowsMetricsCollector(IOptions<TronOptions> opts, ILogger<WindowsMetricsCollector> log)
     {
@@ -179,7 +181,6 @@ public sealed class WindowsMetricsCollector : IMetricsCollector, IDisposable
                     try
                     {
                         var path = "";
-                        var cmdLine = "";
                         try { path = p.MainModule?.FileName ?? ""; } catch { }
                         return new ProcessInfo
                         {
@@ -187,7 +188,7 @@ public sealed class WindowsMetricsCollector : IMetricsCollector, IDisposable
                             Name = p.ProcessName,
                             ExecutablePath = path,
                             MemoryBytes = p.WorkingSet64,
-                            StartTime = p.StartTime.ToUniversalTime()
+                            StartTime = TryGetStartTime(p)
                         };
                     }
                     catch { return null; }
@@ -250,6 +251,12 @@ public sealed class WindowsMetricsCollector : IMetricsCollector, IDisposable
         _ => "UNKNOWN"
     };
 
+    private static DateTimeOffset? TryGetStartTime(Process p)
+    {
+        try { return p.StartTime.ToUniversalTime(); }
+        catch { return null; }
+    }
+
     private static List<SecurityEvent> CollectSecurityEvents(int maxEvents = 20)
     {
         var results = new List<SecurityEvent>();
@@ -258,19 +265,20 @@ public sealed class WindowsMetricsCollector : IMetricsCollector, IDisposable
             var log = new EventLog("Security");
             var recent = log.Entries.Cast<EventLogEntry>()
                 .Where(e => e.TimeGenerated > DateTime.UtcNow.AddHours(-1)
-                         && WatchedEventIds.Contains(e.EventID))
+                         && WatchedEventIds.Contains((int)e.InstanceId))
                 .OrderByDescending(e => e.TimeGenerated)
                 .Take(maxEvents);
 
             foreach (var e in recent)
             {
+                var instanceId = (int)e.InstanceId;
                 results.Add(new SecurityEvent
                 {
                     Timestamp = new DateTimeOffset(e.TimeGenerated.ToUniversalTime()),
-                    EventId = e.EventID.ToString(),
-                    Source = e.Source,
-                    Message = e.Message.Length > 300 ? e.Message[..300] + "…" : e.Message,
-                    Severity = e.EventID == 4625 || e.EventID == 4719 ? SecuritySeverity.Warning : SecuritySeverity.Info
+                    EventId   = instanceId.ToString(),
+                    Source    = e.Source,
+                    Message   = e.Message.Length > 300 ? e.Message[..300] + "…" : e.Message,
+                    Severity  = instanceId == 4625 || instanceId == 4719 ? SecuritySeverity.Warning : SecuritySeverity.Info
                 });
             }
         }
