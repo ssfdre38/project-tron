@@ -11,48 +11,61 @@
 > monitor communications, fight threats, and protect the system on behalf of its Users.
 > This project is not affiliated with, endorsed by, or sponsored by Disney in any way.
 
-An AI-native, next-generation security and monitoring daemon for Windows Server.
+An AI-native, cross-platform system monitoring and security daemon.
+Runs on **Windows**, **Linux**, and **macOS** — as a Windows Service, systemd unit, or console app.
 Watches everything — OS resources, services, processes, network connections,
 security events — learns what *normal* looks like for your system, then alerts through
-Discord in plain English. Asks before acting on anything critical.
+Discord in plain English. Asks before acting on anything critical. No cloud required.
+
+## Requirements
+
+- [.NET 10 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) (or use a self-contained release — no .NET install needed)
+- Windows 10/11/Server 2019+, Ubuntu 20.04+, Debian 11+, or macOS 12+
+- Discord webhook URL *(optional — Tron works without it)*
+- [Ollama](https://ollama.com) with any model *(optional — AI analysis is disabled if not configured)*
 
 ## What it does
 
 | Layer | What Tron watches |
 |---|---|
 | **Resources** | CPU, RAM, disk usage — alert when thresholds exceeded |
-| **Services** | Watched Windows services — alert if any go down |
-| **Security** | Windows Security event log — failed logins, brute-force, audit changes |
+| **Services** | Watched services (Windows SCM / systemd / launchctl) — alert if any go down |
+| **Security** | Security event log (Windows) / auth.log + journald (Linux/macOS) — failed logins, brute-force |
 | **Processes** | Suspicious paths, masquerading system processes, newly appeared executables |
 | **Network** | TCP connections — known C2 ports, port scanning, admin-port abuse |
 | **Baseline** | Welford online algorithm — learns normal, alerts on Z-score anomalies |
-| **AI Analysis** | Every warning-level alert gets a plain-English explanation via local model |
+| **AI Analysis** | Warning-level alerts get a plain-English explanation via any local OpenAI-compatible model |
 
 ## Architecture
 
 ```
 Tron.Core        — Models (SystemSnapshot, Alert, Baseline) + interfaces + config
-Tron.Monitors    — Metrics collector (WMI/PerformanceCounters/SCM) + 6 monitor layers
+Tron.Monitors    — Platform-native metrics collector + 6 monitor layers
 Tron.Alerting    — Alert sinks (Discord webhook, colour-coded embeds) + AI analyzer
-Tron.Service     — Worker service host (Windows Service or console)
+Tron.Service     — Worker service host (Windows Service / systemd / console)
 ```
 
-## Quick start (dev)
+## Quick start
 
-```powershell
-cd src/Tron.Service
+**Prerequisites**: [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
+
+```bash
+git clone https://github.com/ssfdre38/project-tron.git
+cd project-tron/src/Tron.Service
 dotnet run
 ```
 
-Minimal `appsettings.json`:
+Open **http://localhost:18790/** to see the live dashboard.
+
+Minimal `appsettings.json` (all sections are optional — Tron works without Discord or AI):
 
 ```json
 {
   "Tron": {
     "CollectionIntervalSeconds": 30,
-    "WatchedServices": { "Names": ["ash-server"] },
+    "WatchedServices": { "Names": ["nginx", "postgresql"] },
     "Alerting": {
-      "DiscordWebhookUrl": "https://discord.com/api/webhooks/...",
+      "DiscordWebhookUrl": "https://discord.com/api/webhooks/YOUR_WEBHOOK_HERE",
       "CooldownMinutes": 15
     },
     "Baseline": {
@@ -61,7 +74,7 @@ Minimal `appsettings.json`:
     },
     "Ai": {
       "EndpointUrl": "http://localhost:11434",
-      "Model": "gemma4-nano"
+      "Model": "llama3.2"
     }
   }
 }
@@ -115,10 +128,17 @@ Baseline is automatically saved to disk every `SaveIntervalMinutes`.
 
 ### AI Analysis
 After monitors run, any Warning+ alerts are bundled and sent to the configured
-OpenAI-compatible endpoint (Ollama with `gemma4-nano` recommended). The model returns
-a plain-English paragraph that is posted to Discord as a follow-up embed.
+OpenAI-compatible endpoint. Any local model via [Ollama](https://ollama.com) works:
 
-**Recommended local model**: `ssfdre38/gemma4-nano` on Ollama
+```bash
+# Install Ollama, then pull any model:
+ollama pull llama3.2        # recommended — fast and accurate
+ollama pull gemma3:4b       # lighter option
+```
+
+Set `Ai.EndpointUrl` to `http://localhost:11434` and `Ai.Model` to the model name.
+Leave `EndpointUrl` blank to run Tron without AI (all other monitors still work).
+
 A purpose-trained `tron-model` is in design — see [`docs/custom-model.md`](docs/custom-model.md).
 
 ## Web dashboard
@@ -148,6 +168,8 @@ Configure the port (or disable it) in `appsettings.json`:
 
 
 
+## Install as Windows Service
+
 ```powershell
 dotnet publish -c Release -r win-x64 --self-contained -o out
 sc create Tron binpath="C:\path\to\out\Tron.Service.exe"
@@ -161,6 +183,16 @@ sc start Tron
 sudo bash build/linux/install.sh ./Tron.Service
 sudo systemctl status tron
 ```
+
+## Install on macOS
+
+```bash
+# Run as a background process (console):
+dotnet publish -c Release -r osx-arm64 --self-contained -o out
+./out/Tron.Service
+```
+
+Or add a launchd plist to `/Library/LaunchDaemons/` to run at system startup.
 
 ## Custom model
 
