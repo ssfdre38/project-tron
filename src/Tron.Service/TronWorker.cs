@@ -18,11 +18,14 @@ public sealed class TronWorker : BackgroundService
     private readonly Dictionary<string, DateTimeOffset> _lastAlerted = [];
     private TimeSpan AlertCooldown => TimeSpan.FromMinutes(_opts.Alerting.CooldownMinutes);
 
+    private readonly TronStateService _stateService;
+
     public TronWorker(
         IMetricsCollector collector,
         IEnumerable<IMonitor> monitors,
         IEnumerable<IAlertSink> sinks,
         IAiAnalyzer analyzer,
+        TronStateService stateService,
         IOptions<TronOptions> opts,
         ILogger<TronWorker> log)
     {
@@ -30,6 +33,7 @@ public sealed class TronWorker : BackgroundService
         _monitors = monitors;
         _sinks = sinks;
         _analyzer = analyzer;
+        _stateService = stateService;
         _opts = opts.Value;
         _log = log;
     }
@@ -44,6 +48,7 @@ public sealed class TronWorker : BackgroundService
             try
             {
                 var snapshot = await _collector.CollectAsync(stoppingToken);
+                _stateService.UpdateSnapshot(snapshot);
                 _log.LogDebug("Snapshot: CPU={Cpu:F1}% MEM={Mem:F1}% Connections={Conns}",
                     snapshot.Cpu.UsagePercent, snapshot.Memory.UsagePercent, snapshot.Connections.Count);
 
@@ -115,6 +120,7 @@ public sealed class TronWorker : BackgroundService
         }
 
         _lastAlerted[alert.Title] = now;
+        _stateService.AddAlert(alert);
         _log.LogWarning("[{Severity}] {Title}: {Message}", alert.Severity, alert.Title, alert.Message);
 
         foreach (var sink in _sinks)

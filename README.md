@@ -121,7 +121,32 @@ a plain-English paragraph that is posted to Discord as a follow-up embed.
 **Recommended local model**: `ssfdre38/gemma4-nano` on Ollama
 A purpose-trained `tron-model` is in design — see [`docs/custom-model.md`](docs/custom-model.md).
 
-## Install as Windows Service
+## Web dashboard
+
+Once Tron is running, open your browser to:
+
+```
+http://localhost:18790/
+```
+
+The dashboard polls every 5 seconds and shows:
+- **CPU / RAM / Network** gauges with colour-coded thresholds
+- **Disk** usage table (all drives)
+- **Watched services** status (Running / stopped)
+- **Recent alerts** table with severity badges
+- **Top 15 processes** by memory
+- **Active TCP connections** (ESTABLISHED only)
+
+Configure the port (or disable it) in `appsettings.json`:
+
+```json
+"Dashboard": {
+  "Enabled": true,
+  "Port": 18790
+}
+```
+
+
 
 ```powershell
 dotnet publish -c Release -r win-x64 --self-contained -o out

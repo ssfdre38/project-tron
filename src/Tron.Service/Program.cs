@@ -46,8 +46,14 @@ builder.Services.AddSingleton<IAlertSink, DiscordAlertSink>();
 builder.Services.AddHttpClient<LocalModelAnalyzer>();
 builder.Services.AddSingleton<IAiAnalyzer, LocalModelAnalyzer>();
 
+// State service (shared between TronWorker and DashboardService)
+builder.Services.AddSingleton<TronStateService>();
+
 // Main worker
 builder.Services.AddHostedService<TronWorker>();
+
+// Embedded web dashboard
+builder.Services.AddHostedService<DashboardService>();
 
 var host = builder.Build();
 host.Run();

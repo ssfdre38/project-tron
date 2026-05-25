@@ -12,7 +12,11 @@ namespace Tron.Monitors.Monitors;
 public sealed class ProcessMonitor : IMonitor
 {
     private readonly ILogger<ProcessMonitor> _log;
+    private readonly IBaselineRepository _repo;
     public string Name => "Process";
+
+    private BaselineStore? _baseline;
+    private bool _baselineLoaded;
 
     // Windows: executables running from these paths are suspicious
     private static readonly string[] SuspiciousPathsWindows =
@@ -41,16 +45,30 @@ public sealed class ProcessMonitor : IMonitor
         "launchd", "kernel_task"
     };
 
-    public ProcessMonitor(ILogger<ProcessMonitor> log) => _log = log;
-
-    public Task<IEnumerable<Alert>> CheckAsync(SystemSnapshot snapshot, CancellationToken ct = default)
+    public ProcessMonitor(ILogger<ProcessMonitor> log, IBaselineRepository repo)
     {
+        _log = log;
+        _repo = repo;
+    }
+
+    public async Task<IEnumerable<Alert>> CheckAsync(SystemSnapshot snapshot, CancellationToken ct = default)
+    {
+        // Load baseline once so we know which process names have been seen before
+        if (!_baselineLoaded)
+        {
+            _baseline = await _repo.LoadAsync(ct);
+            _baselineLoaded = true;
+        }
+
         var alerts = new List<Alert>();
 
         foreach (var proc in snapshot.TopProcesses)
         {
-            // New process never seen before in baseline
-            if (proc.IsNewlyObserved)
+            // New process never seen before in baseline (or flagged by collector)
+            var isNew = proc.IsNewlyObserved ||
+                        (_baseline != null && !_baseline.KnownProcessNames.Contains(proc.Name));
+
+            if (isNew)
             {
                 alerts.Add(new Alert
                 {
@@ -69,11 +87,11 @@ public sealed class ProcessMonitor : IMonitor
             {
                 alerts.Add(new Alert
                 {
-                    Severity        = AlertSeverity.Critical,
-                    Category        = AlertCategory.Security,
-                    Title           = $"Suspicious Process: {proc.Name}",
-                    Message         = $"System process '{proc.Name}' (PID {proc.Pid}) is running from an unexpected path: {proc.ExecutablePath}. This may indicate malware masquerading as a system process.",
-                    SuggestedAction = "Investigate immediately — terminate if confirmed malicious.",
+                    Severity         = AlertSeverity.Critical,
+                    Category         = AlertCategory.Security,
+                    Title            = $"Suspicious Process: {proc.Name}",
+                    Message          = $"System process '{proc.Name}' (PID {proc.Pid}) is running from an unexpected path: {proc.ExecutablePath}. This may indicate malware masquerading as a system process.",
+                    SuggestedAction  = "Investigate immediately — terminate if confirmed malicious.",
                     RequiresApproval = true
                 });
             }
@@ -92,7 +110,7 @@ public sealed class ProcessMonitor : IMonitor
             }
         }
 
-        return Task.FromResult<IEnumerable<Alert>>(alerts);
+        return alerts;
     }
 
     private static bool IsSystemProcessName(string name) =>
@@ -102,19 +120,18 @@ public sealed class ProcessMonitor : IMonitor
 
     private static bool IsLegitimateSystemPath(string path)
     {
-        // Normalise to forward slashes for uniform comparison
         var p = path.Replace('\\', '/').ToLowerInvariant();
         if (OperatingSystem.IsWindows())
             return p.Contains("/windows/system32/") ||
                    p.Contains("/windows/syswow64/") ||
                    p.Contains("/windows/systemnative/");
         // Linux / macOS
-        return p.StartsWith("/usr/sbin/")   ||
-               p.StartsWith("/usr/bin/")    ||
-               p.StartsWith("/sbin/")       ||
-               p.StartsWith("/bin/")        ||
-               p.StartsWith("/lib/systemd/")||
-               p.StartsWith("/usr/lib/")    ||
+        return p.StartsWith("/usr/sbin/")    ||
+               p.StartsWith("/usr/bin/")     ||
+               p.StartsWith("/sbin/")        ||
+               p.StartsWith("/bin/")         ||
+               p.StartsWith("/lib/systemd/") ||
+               p.StartsWith("/usr/lib/")     ||
                p.StartsWith("/usr/libexec/");
     }
 
@@ -122,7 +139,6 @@ public sealed class ProcessMonitor : IMonitor
     {
         var p = path.Replace('\\', '/').ToLowerInvariant();
         var patterns = OperatingSystem.IsWindows() ? SuspiciousPathsWindows : SuspiciousPathsUnix;
-        // Normalise patterns to forward slashes too
         return patterns.Any(sp => p.Contains(sp.Replace('\\', '/')));
     }
 }

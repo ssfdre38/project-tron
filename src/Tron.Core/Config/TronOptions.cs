@@ -11,6 +11,7 @@ public class TronOptions
     public AlertingOptions Alerting { get; set; } = new();
     public BaselineOptions Baseline { get; set; } = new();
     public AiOptions Ai { get; set; } = new();
+    public DashboardOptions Dashboard { get; set; } = new();
 }
 
 public class ThresholdOptions
@@ -62,4 +63,12 @@ public class AiOptions
     public string Model { get; set; } = "gemma4-nano";
     /// <summary>Only invoke AI analysis for alerts at or above this severity.</summary>
     public string MinSeverityForAnalysis { get; set; } = "Warning";
+}
+
+public class DashboardOptions
+{
+    /// <summary>Whether to serve the local web dashboard.</summary>
+    public bool Enabled { get; set; } = true;
+    /// <summary>Port for the embedded HTTP dashboard (localhost only).</summary>
+    public int Port { get; set; } = 18790;
 }
