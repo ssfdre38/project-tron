@@ -1,5 +1,9 @@
 # Project Tron — AI-native system guardian
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![.NET 10](https://img.shields.io/badge/.NET-10-purple.svg)](https://dotnet.microsoft.com/download/dotnet/10.0)
+[![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)](README.md)
+
 > *"I fight for the Users."*
 > — Tron, [TRON (1982)](https://www.imdb.com/title/tt0084827/quotes/?item=qt0432721)
 
@@ -93,9 +97,11 @@ Minimal `appsettings.json` (all sections are optional — Tron works without Dis
 | `Alerting` | `CooldownMinutes` | `15` | Per-alert-title cooldown to reduce noise |
 | `Baseline` | `StorePath` | `tron-baseline.json` | Where to persist learned baseline |
 | `Baseline` | `EnableAnomalyDetection` | `true` | Toggle z-score anomaly monitor |
-| `Ai` | `EndpointUrl` | — | OpenAI-compatible endpoint (Ollama, ash-server) |
-| `Ai` | `Model` | `gemma4-nano` | Model to call for alert analysis |
+| `Ai` | `EndpointUrl` | — | OpenAI-compatible endpoint (Ollama, any local model) |
+| `Ai` | `Model` | `llama3.2` | Model name to call for alert analysis |
 | `Ai` | `MinSeverityForAnalysis` | `Warning` | Don't call AI for Info-level alerts |
+| `Dashboard` | `Enabled` | `true` | Serve the local web dashboard |
+| `Dashboard` | `Port` | `18790` | Port for `http://localhost:{port}/` |
 
 ## Monitors
 
@@ -197,6 +203,15 @@ Or add a launchd plist to `/Library/LaunchDaemons/` to run at system startup.
 ## Custom model
 
 See [`docs/custom-model.md`](docs/custom-model.md) for the full design —
-a Gemma 4 Nano-based model fine-tuned on Windows security telemetry, trained
-from Tron's own baseline data and public EVTX/threat datasets.
+a small model fine-tuned on real system telemetry and public security datasets
+to provide accurate, context-aware alert analysis fully offline.
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Issues and pull requests are welcome.
+
+## License
+
+[MIT](LICENSE) — see LICENSE for details.
+
+> TRON™ is a trademark of The Walt Disney Company. This project is not affiliated with Disney.

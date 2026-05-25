@@ -5,3 +5,20 @@ obj/
 *.suo
 out/
 publish/
+
+# Runtime data files — do not commit
+tron-baseline.json
+*.log
+logs/
+
+# User-local config overrides
+appsettings.Development.json
+appsettings.Local.json
+appsettings.Production.json
+
+# macOS
+.DS_Store
+
+# JetBrains Rider
+.idea/
+*.sln.DotSettings.user
