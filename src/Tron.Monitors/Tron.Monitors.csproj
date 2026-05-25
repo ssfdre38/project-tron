@@ -9,6 +9,13 @@
     <ProjectReference Include="..\Tron.Core\Tron.Core.csproj" />
   </ItemGroup>
 
+  <!-- Copy default threat intel blocklist to output -->
+  <ItemGroup>
+    <None Update="ThreatIntel\default-blocklist.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.8" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.8" />

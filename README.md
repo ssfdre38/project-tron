@@ -37,15 +37,17 @@ Discord in plain English. Asks before acting on anything critical. No cloud requ
 | **Security** | Security event log (Windows) / auth.log + journald (Linux/macOS) — failed logins, brute-force |
 | **Processes** | Suspicious paths, masquerading system processes, newly appeared executables |
 | **Network** | TCP connections — known C2 ports, port scanning, admin-port abuse |
+| **Threat Intel** | Cross-references active connections against local IP blocklist + AbuseIPDB (optional) |
 | **Baseline** | Welford online algorithm — learns normal, alerts on Z-score anomalies |
+| **MITRE ATT&CK** | Every alert is automatically tagged with the matching ATT&CK technique (T-ID, tactic, link) |
 | **AI Analysis** | Warning-level alerts get a plain-English explanation via any local OpenAI-compatible model |
 
 ## Architecture
 
 ```
 Tron.Core        — Models (SystemSnapshot, Alert, Baseline) + interfaces + config
-Tron.Monitors    — Platform-native metrics collector + 6 monitor layers
-Tron.Alerting    — Alert sinks (Discord webhook, colour-coded embeds) + AI analyzer
+Tron.Monitors    — Platform-native metrics collector + 7 monitor layers (incl. ThreatIntel)
+Tron.Alerting    — Alert sinks (Discord webhook, Email, generic Webhook) + AI analyzer
 Tron.Service     — Worker service host (Windows Service / systemd / console)
 ```
 
@@ -95,6 +97,20 @@ Minimal `appsettings.json` (all sections are optional — Tron works without Dis
 | `Alerting` | `DiscordWebhookUrl` | — | Discord webhook; leave blank to disable |
 | `Alerting` | `MinSeverity` | `Warning` | Minimum alert level to send |
 | `Alerting` | `CooldownMinutes` | `15` | Per-alert-title cooldown to reduce noise |
+| `Email` | `Enabled` | `false` | Enable SMTP email alerts |
+| `Email` | `SmtpHost` | — | SMTP server hostname |
+| `Email` | `SmtpPort` | `587` | SMTP port (587 = STARTTLS, 465 = SSL) |
+| `Email` | `FromAddress` | — | Sender address |
+| `Email` | `ToAddresses` | `[]` | Recipient list |
+| `Email` | `MinSeverity` | `Warning` | Don't email below this level |
+| `Webhook` | `Enabled` | `false` | Enable generic HTTP webhook |
+| `Webhook` | `Url` | — | Target URL (Slack, Teams, SIEM, custom) |
+| `Webhook` | `AuthHeader` | — | Value for `Authorization` header (e.g. `Bearer token123`) |
+| `Webhook` | `MinSeverity` | `Warning` | Don't POST below this level |
+| `ThreatIntel` | `Enabled` | `true` | Enable IP blocklist monitor |
+| `ThreatIntel` | `BlocklistPath` | — | Path to custom JSON blocklist; blank = use built-in list |
+| `ThreatIntel` | `AbuseIpDbApiKey` | — | [AbuseIPDB](https://www.abuseipdb.com) API key; blank = local-only |
+| `ThreatIntel` | `AbuseIpDbMinScore` | `75` | Confidence score threshold (0–100) |
 | `Baseline` | `StorePath` | `tron-baseline.json` | Where to persist learned baseline |
 | `Baseline` | `EnableAnomalyDetection` | `true` | Toggle z-score anomaly monitor |
 | `Ai` | `EndpointUrl` | — | OpenAI-compatible endpoint (Ollama, any local model) |
@@ -126,6 +142,31 @@ Reads the Windows Security event log:
 - Known C2 / exfil destination ports (4444, 6666, 9999, 31337, 1337 and others)
 - Port scanning: > 20 unique remote ports from one host in a single tick
 - Admin ports from external IPs: RDP (3389), WinRM (5985/5986), SMB (445)
+
+### ThreatIntelMonitor
+Cross-references every active outbound connection against:
+1. **Built-in blocklist** — ships with Tron; covers known C2 ranges, Tor exit nodes, bulletproof hosting,
+   reconnaissance scanner infrastructure (Shodan, Censys), and dangerous destination ports
+   (Metasploit 4444, Back Orifice 31337, IRC botnets 6666–6669, etc.)
+2. **Custom blocklist** — point `ThreatIntel.BlocklistPath` at your own JSON file with the same schema
+3. **AbuseIPDB** (optional) — if you provide a free API key, Tron checks every external IP and alerts
+   on anything with a confidence score above `AbuseIpDbMinScore`. Results are cached for 24 hours
+   to avoid burning the free tier
+
+Private IPs (RFC 1918 / loopback / link-local) are always ignored.
+
+### MITRE ATT&CK tagging
+Every alert is automatically mapped to the closest [MITRE ATT&CK](https://attack.mitre.org) technique.
+The technique ID, name, tactic, and direct URL appear in Discord embeds, email alerts, and webhook payloads.
+Coverage includes: T1110 (Brute Force), T1046 (Network Scanning), T1059 (Scripting), T1496 (Resource Hijacking),
+T1489 (Service Stop), T1562 (Defence Evasion), and ~15 others.
+
+### Alert sinks — all optional, all independent
+| Sink | Description |
+|---|---|
+| **Discord webhook** | Colour-coded embeds with severity, category, ATT&CK tag |
+| **Email (SMTP)** | HTML + plain-text multipart; works with Gmail, Outlook, self-hosted Postfix |
+| **Generic webhook** | HTTP POST JSON to any URL — Slack incoming hooks, Microsoft Teams, PagerDuty, custom SIEMs |
 
 ### BaselineMonitor
 Learns CPU, memory, disk, network, process count, connection count using Welford's online algorithm.

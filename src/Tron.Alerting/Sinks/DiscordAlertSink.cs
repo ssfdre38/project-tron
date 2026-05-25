@@ -57,6 +57,15 @@ public sealed class DiscordAlertSink : IAlertSink
         if (alert.RequiresApproval)
             fields.Add(new { name = "Action Required", value = "Reply with **approve** or **deny** to proceed.", inline = false });
 
+        if (alert.MitreAttack != null)
+            fields.Add(new
+            {
+                name  = "MITRE ATT&CK",
+                value = $"[{alert.MitreAttack.TechniqueId} — {alert.MitreAttack.TechniqueName}]({alert.MitreAttack.Url})" +
+                        $"\nTactic: {alert.MitreAttack.TacticName}",
+                inline = false
+            });
+
         var payload = new
         {
             embeds = new[]

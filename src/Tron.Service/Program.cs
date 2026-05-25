@@ -37,10 +37,15 @@ builder.Services.AddSingleton<IMonitor, ProcessMonitor>();
 builder.Services.AddSingleton<IMonitor, NetworkConnectionMonitor>();
 builder.Services.AddSingleton<IMonitor, SecurityEventMonitor>();
 builder.Services.AddSingleton<IMonitor, BaselineMonitor>();
+builder.Services.AddHttpClient<ThreatIntelMonitor>();
+builder.Services.AddSingleton<IMonitor, ThreatIntelMonitor>();
 
 // Alert sinks
 builder.Services.AddHttpClient<DiscordAlertSink>();
 builder.Services.AddSingleton<IAlertSink, DiscordAlertSink>();
+builder.Services.AddSingleton<IAlertSink, EmailAlertSink>();
+builder.Services.AddHttpClient<WebhookAlertSink>();
+builder.Services.AddSingleton<IAlertSink, WebhookAlertSink>();
 
 // AI analyzer (local model endpoint)
 builder.Services.AddHttpClient<LocalModelAnalyzer>();

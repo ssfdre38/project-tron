@@ -11,6 +11,17 @@ public record Alert
     public string? SuggestedAction { get; init; }
     public bool RequiresApproval { get; init; }
     public bool Acknowledged { get; init; }
+    /// <summary>MITRE ATT&amp;CK technique this alert maps to, if known.</summary>
+    public MitreAttackInfo? MitreAttack { get; init; }
+}
+
+/// <summary>MITRE ATT&amp;CK technique reference attached to an alert.</summary>
+public record MitreAttackInfo(
+    string TechniqueId,
+    string TechniqueName,
+    string TacticName)
+{
+    public string Url => $"https://attack.mitre.org/techniques/{TechniqueId.Replace('.', '/')}/";
 }
 
 public enum AlertSeverity { Info, Warning, Critical }
@@ -24,5 +35,6 @@ public enum AlertCategory
     Service,
     Process,
     Security,
-    Agent
+    Agent,
+    ThreatIntel
 }

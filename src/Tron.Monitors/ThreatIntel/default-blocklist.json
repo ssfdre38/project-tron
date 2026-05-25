@@ -1,0 +1,97 @@
+{
+  "_comment": "Tron default threat intelligence blocklist. Add your own entries under 'custom'.",
+  "_updated": "2026-05-24",
+  "_sources": [
+    "Known C2 infrastructure from public threat reports",
+    "Bulletproof hosting ranges frequently cited in security research",
+    "Ports commonly associated with reverse shells and C2 frameworks"
+  ],
+
+  "blockedPorts": [
+    { "port": 4444,  "note": "Metasploit default listener" },
+    { "port": 4445,  "note": "Metasploit alternate" },
+    { "port": 31337, "note": "Back Orifice / legacy RAT" },
+    { "port": 1337,  "note": "Common C2 / RAT port" },
+    { "port": 6666,  "note": "IRC-based botnet C2" },
+    { "port": 6667,  "note": "IRC-based botnet C2" },
+    { "port": 6668,  "note": "IRC-based botnet C2" },
+    { "port": 6669,  "note": "IRC-based botnet C2" },
+    { "port": 9999,  "note": "Common RAT / backdoor port" },
+    { "port": 12345, "note": "NetBus RAT" },
+    { "port": 27374, "note": "Sub7 RAT" },
+    { "port": 65535, "note": "Maximum port — often used to avoid detection" }
+  ],
+
+  "blockedCidrs": [
+    { "cidr": "0.0.0.0/8",       "note": "This network (RFC 1122)" },
+    { "cidr": "100.64.0.0/10",   "note": "Shared address space (RFC 6598)" },
+    { "cidr": "192.0.0.0/24",    "note": "IETF Protocol Assignments" },
+    { "cidr": "192.0.2.0/24",    "note": "TEST-NET-1 (documentation)" },
+    { "cidr": "198.18.0.0/15",   "note": "Benchmarking (RFC 2544)" },
+    { "cidr": "198.51.100.0/24", "note": "TEST-NET-2 (documentation)" },
+    { "cidr": "203.0.113.0/24",  "note": "TEST-NET-3 (documentation)" },
+    { "cidr": "240.0.0.0/4",     "note": "Reserved (RFC 1112)" },
+    { "cidr": "255.255.255.255/32", "note": "Limited broadcast" }
+  ],
+
+  "knownMaliciousIps": [
+    {
+      "ip": "185.220.101.0/24",
+      "note": "Tor exit node range — frequently abused for anonymised attacks",
+      "tags": ["tor", "anonymiser"]
+    },
+    {
+      "ip": "185.220.102.0/24",
+      "note": "Tor exit node range",
+      "tags": ["tor", "anonymiser"]
+    },
+    {
+      "ip": "185.220.103.0/24",
+      "note": "Tor exit node range",
+      "tags": ["tor", "anonymiser"]
+    },
+    {
+      "ip": "193.32.162.0/24",
+      "note": "Bulletproof hosting — frequent C2 infrastructure",
+      "tags": ["bulletproof", "c2"]
+    },
+    {
+      "ip": "5.188.206.0/24",
+      "note": "Bulletproof hosting range — historically associated with spam and malware distribution",
+      "tags": ["bulletproof", "spam"]
+    },
+    {
+      "ip": "91.108.4.0/22",
+      "note": "Telegram infrastructure — legitimate but monitor unusual outbound traffic",
+      "tags": ["messaging"]
+    },
+    {
+      "ip": "45.142.212.0/24",
+      "note": "Range associated with RDP brute-force infrastructure",
+      "tags": ["brute-force", "rdp"]
+    },
+    {
+      "ip": "80.82.77.0/24",
+      "note": "Shodan scanner range — if you see connections TO this, your system was scanned",
+      "tags": ["scanner", "recon"]
+    },
+    {
+      "ip": "71.6.135.0/24",
+      "note": "Censys scanner infrastructure",
+      "tags": ["scanner", "recon"]
+    },
+    {
+      "ip": "71.6.146.0/24",
+      "note": "Censys scanner infrastructure",
+      "tags": ["scanner", "recon"]
+    }
+  ],
+
+  "custom": [
+    {
+      "_comment": "Add your own blocked IPs/CIDRs here",
+      "ip": "",
+      "note": ""
+    }
+  ]
+}

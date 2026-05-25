@@ -12,6 +12,9 @@ public class TronOptions
     public BaselineOptions Baseline { get; set; } = new();
     public AiOptions Ai { get; set; } = new();
     public DashboardOptions Dashboard { get; set; } = new();
+    public EmailOptions Email { get; set; } = new();
+    public WebhookOptions Webhook { get; set; } = new();
+    public ThreatIntelOptions ThreatIntel { get; set; } = new();
 }
 
 public class ThresholdOptions
@@ -72,3 +75,55 @@ public class DashboardOptions
     /// <summary>Port for the embedded HTTP dashboard (localhost only).</summary>
     public int Port { get; set; } = 18790;
 }
+
+public class EmailOptions
+{
+    /// <summary>Set to true to enable email alerting via SMTP.</summary>
+    public bool Enabled { get; set; } = false;
+    public string SmtpHost { get; set; } = "smtp.gmail.com";
+    public int SmtpPort { get; set; } = 587;
+    public bool UseSsl { get; set; } = true;
+    public string Username { get; set; } = "";
+    public string Password { get; set; } = "";
+    public string FromAddress { get; set; } = "tron@example.com";
+    public string FromName { get; set; } = "Tron Guardian";
+    public List<string> ToAddresses { get; set; } = [];
+    /// <summary>Minimum severity level to send email for.</summary>
+    public string MinSeverity { get; set; } = "Warning";
+}
+
+public class WebhookOptions
+{
+    /// <summary>Set to true to enable generic webhook alerting (Slack, Teams, PagerDuty, etc.).</summary>
+    public bool Enabled { get; set; } = false;
+    /// <summary>HTTP POST target URL.</summary>
+    public string Url { get; set; } = "";
+    /// <summary>Optional Authorization header value (e.g. "Bearer token123").</summary>
+    public string? AuthHeader { get; set; }
+    /// <summary>Minimum severity level to POST for.</summary>
+    public string MinSeverity { get; set; } = "Warning";
+    /// <summary>Include the full system snapshot in the webhook payload.</summary>
+    public bool IncludeSnapshot { get; set; } = false;
+}
+
+public class ThreatIntelOptions
+{
+    /// <summary>Enable threat intelligence IP reputation checks.</summary>
+    public bool Enabled { get; set; } = true;
+    /// <summary>
+    /// Path to a JSON blocklist file. Defaults to the built-in list shipped with Tron.
+    /// Supply your own to extend or replace it.
+    /// </summary>
+    public string BlocklistPath { get; set; } = "";
+    /// <summary>
+    /// Optional AbuseIPDB API key for dynamic reputation lookups.
+    /// Free tier: 1,000 checks/day. Leave blank to use local blocklist only.
+    /// Get a free key at https://www.abuseipdb.com/
+    /// </summary>
+    public string AbuseIpDbApiKey { get; set; } = "";
+    /// <summary>Only alert if AbuseIPDB confidence score meets this threshold (0-100).</summary>
+    public int AbuseIpDbMinScore { get; set; } = 75;
+    /// <summary>Cache AbuseIPDB results for this many minutes (reduces API usage).</summary>
+    public int AbuseIpDbCacheDurationMinutes { get; set; } = 1440;
+}
+

@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using Tron.Core.Config;
 using Tron.Core.Interfaces;
 using Tron.Core.Models;
+using Tron.Core.Services;
 
 namespace Tron.Service;
 
@@ -64,6 +65,17 @@ public sealed class TronWorker : BackgroundService
                     catch (Exception ex)
                     {
                         _log.LogWarning(ex, "Monitor {Name} threw an exception", monitor.Name);
+                    }
+                }
+
+                // Apply MITRE ATT&CK mapping to any alert that doesn't already have one
+                for (int i = 0; i < allAlerts.Count; i++)
+                {
+                    if (allAlerts[i].MitreAttack == null)
+                    {
+                        var mapped = MitreAttackMapper.Map(allAlerts[i]);
+                        if (mapped != null)
+                            allAlerts[i] = allAlerts[i] with { MitreAttack = mapped };
                     }
                 }
 
