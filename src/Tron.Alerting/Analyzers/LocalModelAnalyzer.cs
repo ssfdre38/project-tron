@@ -51,26 +51,44 @@ public sealed class LocalModelAnalyzer : IAiAnalyzer
                 new { role = "system", content = systemPrompt },
                 new { role = "user", content = userMessage }
             },
-            max_tokens = 300,
+            // 1024 tokens required: Gemma 4 IT uses chain-of-thought reasoning internally (~700 thinking
+            // tokens) before producing the actual response. 300 is insufficient — all budget goes to
+            // thinking and content comes back empty. 1024 gives ~300 tokens of actual response.
+            max_tokens = 1024,
             temperature = 0.3
         };
 
         var json = JsonSerializer.Serialize(requestBody);
-        var content = new StringContent(json, Encoding.UTF8, "application/json");
+        var requestContent = new StringContent(json, Encoding.UTF8, "application/json");
 
         try
         {
             var url = _opts.Ai.EndpointUrl!.TrimEnd('/') + "/v1/chat/completions";
-            var response = await _http.PostAsync(url, content, ct);
+            var response = await _http.PostAsync(url, requestContent, ct);
             response.EnsureSuccessStatusCode();
 
             var responseJson = await response.Content.ReadAsStringAsync(ct);
             using var doc = JsonDocument.Parse(responseJson);
-            return doc.RootElement
+            var message = doc.RootElement
                 .GetProperty("choices")[0]
-                .GetProperty("message")
-                .GetProperty("content")
-                .GetString();
+                .GetProperty("message");
+
+            // Primary: content field (populated when model has enough tokens for thinking + response)
+            var content = message.TryGetProperty("content", out var c) ? c.GetString() : null;
+            if (!string.IsNullOrWhiteSpace(content)) return content;
+
+            // Fallback: reasoning_content (Gemma 4 IT thinking model — rare case where content is empty)
+            if (message.TryGetProperty("reasoning_content", out var rc))
+            {
+                var reasoning = rc.GetString();
+                if (!string.IsNullOrWhiteSpace(reasoning))
+                {
+                    // Extract the last paragraph of reasoning as the final answer
+                    var parts = reasoning.Split("\n\n", StringSplitOptions.RemoveEmptyEntries);
+                    return parts.LastOrDefault()?.Trim();
+                }
+            }
+            return null;
         }
         catch (Exception ex)
         {

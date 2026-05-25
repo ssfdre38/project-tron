@@ -48,7 +48,7 @@ PARAMETER top_p 0.9
 PARAMETER repeat_penalty 1.1
 PARAMETER num_ctx 8192
 PARAMETER num_batch 512
-PARAMETER num_thread 8
+PARAMETER num_thread 6
 
 LICENSE """Apache License 2.0 — Copyright 2024 Google LLC
 Tron model specialization by ssfdre38, 2026.

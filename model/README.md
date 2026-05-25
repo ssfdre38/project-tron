@@ -17,8 +17,11 @@ Start with **e2b** — it fits on any modern machine and security analysis is st
 
 ```
 model/
+├── server/
+│   ├── start-tron-server.ps1   ← Recommended: llama-server direct (Windows, ~18 t/s)
+│   └── start-tron-server.sh    ← Recommended: llama-server direct (Linux/macOS)
 ├── ollama/
-│   └── Modelfile.tron          ← Deploy today (specialized system prompt on e2b-turbo)
+│   └── Modelfile.tron          ← Alternative: Ollama (note: 4x slower on CPU in 0.24.x)
 ├── preprocessing/
 │   ├── snapshot_to_prompt.py   ← Convert Tron SystemSnapshot JSON → training examples
 │   ├── normalize_evtx.py       ← Parse Windows EVTX event logs → training examples
@@ -38,20 +41,48 @@ model/
 
 ## Quick start: Deploy today (no training required)
 
-The `Modelfile.tron` uses the existing `gemma4-e2b-iq4xs-turbo.gguf` with a specialized
-security system prompt. No training needed — deploy in 30 seconds:
+### Option A — llama-server direct (recommended, ~18 t/s on CPU)
+
+Bypasses Ollama's engine overhead for Gemma 4, which runs 4x slower in Ollama 0.24.x.
+Requires [llama.cpp](https://github.com/ggml-org/llama.cpp/releases) (`llama-server` binary).
+
+**Windows:**
+```powershell
+.\model\server\start-tron-server.ps1
+# Auto-detects llama-server and model, starts on http://localhost:11435
+```
+
+**Linux/macOS:**
+```bash
+chmod +x model/server/start-tron-server.sh
+./model/server/start-tron-server.sh
+```
+
+`appsettings.json` (already configured for port 11435):
+```json
+"Ai": {
+  "EndpointUrl": "http://localhost:11435",
+  "Model": "tron-model"
+}
+```
+
+### Option B — Ollama (easier setup, slower on CPU)
 
 ```bash
 ollama create tron-model -f model/ollama/Modelfile.tron
 ```
 
-Then update `appsettings.json`:
+Update `appsettings.json` to use Ollama's port:
 ```json
 "Ai": {
   "EndpointUrl": "http://localhost:11434",
   "Model": "tron-model"
 }
 ```
+
+> **Performance note:** Ollama 0.24.x routes Gemma 4 through an alternative engine that runs
+> ~4-5 t/s on CPU vs ~18 t/s with direct llama-server. On a 6-core machine, expect ~40s
+> response time with llama-server vs ~230s with Ollama. Use Option A when performance matters.
 
 ## Fine-tuning pipeline (Phase 2)
 
@@ -101,10 +132,12 @@ python training/export_gguf.py \
 ```
 
 ### 5. Deploy
-```bash
-# Copy to gemma4 family directory, create Ollama model:
+```powershell
+# Windows — start server with the trained model:
+.\model\server\start-tron-server.ps1 -Model .\model\training\output\tron-model-v1.gguf
+
+# Or via Ollama (update FROM path in Modelfile.tron first):
 ollama create tron-model-v1 -f model/ollama/Modelfile.tron
-# Update Modelfile FROM to point at tron-model-v1.gguf
 ```
 
 ## Dataset sources
@@ -124,7 +157,7 @@ The trained model plugs directly into the existing `LocalModelAnalyzer`:
 
 ```json
 "Ai": {
-  "EndpointUrl": "http://localhost:11434",
+  "EndpointUrl": "http://localhost:11435",
   "Model": "tron-model-v1"
 }
 ```
