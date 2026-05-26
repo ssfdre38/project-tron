@@ -26,6 +26,20 @@ public record MitreAttackInfo(
 
 public enum AlertSeverity { Info, Warning, Critical }
 
+public enum AlertApprovalState
+{
+    /// <summary>Alert does not require approval.</summary>
+    None,
+    /// <summary>Awaiting human decision.</summary>
+    Pending,
+    /// <summary>Human approved the suggested action.</summary>
+    Approved,
+    /// <summary>Human denied the suggested action.</summary>
+    Denied,
+    /// <summary>Alert has been acknowledged / read without an explicit approve/deny.</summary>
+    Acknowledged
+}
+
 public enum AlertCategory
 {
     Cpu,

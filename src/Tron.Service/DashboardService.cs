@@ -43,7 +43,9 @@ public sealed class DashboardService : BackgroundService
             return;
         }
 
-        var prefix = $"http://127.0.0.1:{_opts.Dashboard.Port}/";
+        var bind    = _opts.Dashboard.BindAddress;
+        if (string.IsNullOrWhiteSpace(bind)) bind = "127.0.0.1";
+        var prefix = $"http://{bind}:{_opts.Dashboard.Port}/";
         using var listener = new HttpListener();
         listener.Prefixes.Add(prefix);
 
@@ -85,15 +87,28 @@ public sealed class DashboardService : BackgroundService
     {
         try
         {
-            var path = ctx.Request.Url?.AbsolutePath ?? "/";
+            var path   = ctx.Request.Url?.AbsolutePath ?? "/";
+            var method = ctx.Request.HttpMethod.ToUpperInvariant();
 
-            if (path == "/api/status")
+            if (method == "GET" && path == "/api/status")
             {
                 await WriteJsonAsync(ctx.Response, BuildStatusDto(), ct);
             }
-            else if (path == "/api/alerts")
+            else if (method == "GET" && path == "/api/alerts")
             {
-                await WriteJsonAsync(ctx.Response, _state.RecentAlerts, ct);
+                await WriteJsonAsync(ctx.Response, BuildAlertsDto(), ct);
+            }
+            else if (method == "POST" && path.StartsWith("/api/alerts/") && path.EndsWith("/approve"))
+            {
+                await HandleApprovalActionAsync(ctx, path, AlertApprovalState.Approved, ct);
+            }
+            else if (method == "POST" && path.StartsWith("/api/alerts/") && path.EndsWith("/deny"))
+            {
+                await HandleApprovalActionAsync(ctx, path, AlertApprovalState.Denied, ct);
+            }
+            else if (method == "POST" && path.StartsWith("/api/alerts/") && path.EndsWith("/acknowledge"))
+            {
+                await HandleApprovalActionAsync(ctx, path, AlertApprovalState.Acknowledged, ct);
             }
             else
             {
@@ -112,6 +127,32 @@ public sealed class DashboardService : BackgroundService
         }
     }
 
+    private async Task HandleApprovalActionAsync(
+        HttpListenerContext ctx, string path, AlertApprovalState newState, CancellationToken ct)
+    {
+        // Extract alert ID from path: /api/alerts/{id}/approve
+        var segments = path.Trim('/').Split('/');
+        // segments: ["api", "alerts", "{id}", "approve"]
+        if (segments.Length < 4 || !Guid.TryParse(segments[2], out var alertId))
+        {
+            ctx.Response.StatusCode = 400;
+            await WriteJsonAsync(ctx.Response, new { error = "Invalid alert ID." }, ct);
+            return;
+        }
+
+        var ok = _state.SetApprovalState(alertId, newState);
+        if (!ok)
+        {
+            ctx.Response.StatusCode = 404;
+            await WriteJsonAsync(ctx.Response, new { error = "Alert not found or does not require approval." }, ct);
+            return;
+        }
+
+        _log.LogInformation("[dashboard] Alert {Id} → {State}", alertId, newState);
+        ctx.Response.Headers["Access-Control-Allow-Origin"] = "*";
+        await WriteJsonAsync(ctx.Response, new { success = true, state = newState.ToString().ToLowerInvariant() }, ct);
+    }
+
     private async Task WriteJsonAsync(HttpListenerResponse response, object data, CancellationToken ct)
     {
         var json = JsonSerializer.Serialize(data, JsonOpts);
@@ -121,6 +162,22 @@ public sealed class DashboardService : BackgroundService
         response.Headers["Access-Control-Allow-Origin"] = "*";
         await response.OutputStream.WriteAsync(bytes, ct);
     }
+
+    private IReadOnlyList<AlertDto> BuildAlertsDto() =>
+        _state.RecentAlerts
+            .Select(a => new AlertDto
+            {
+                Id             = a.Id,
+                Timestamp      = a.Timestamp,
+                Severity       = a.Severity,
+                Category       = a.Category,
+                Title          = a.Title,
+                Message        = a.Message,
+                SuggestedAction = a.SuggestedAction,
+                RequiresApproval = a.RequiresApproval,
+                ApprovalState  = _state.GetApprovalState(a.Id)
+            })
+            .ToList();
 
     private StatusDto BuildStatusDto()
     {
@@ -138,7 +195,7 @@ public sealed class DashboardService : BackgroundService
             Connections  = snap.Connections
                                .Where(c => c.State == "ESTABLISHED")
                                .Take(20).ToList(),
-            RecentAlerts = _state.RecentAlerts.TakeLast(50).Reverse().ToList()
+            RecentAlerts = BuildAlertsDto()
         };
     }
 
@@ -203,6 +260,17 @@ public sealed class DashboardService : BackgroundService
   .badge-critical { background: #3a0808; color: var(--red); }
   .badge-ok { background: #0d2e1a; color: var(--green); }
 
+  .btn { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 4px;
+    font-size: 11px; font-weight: 600; cursor: pointer; border: none; transition: opacity 0.15s; }
+  .btn:hover { opacity: 0.85; }
+  .btn-approve { background: #0d2e1a; color: var(--green); border: 1px solid #22c55e44; }
+  .btn-deny { background: #3a0808; color: var(--red); border: 1px solid #ef444444; }
+  .btn-ack { background: #1e3a5f; color: var(--tron); border: 1px solid #00d4ff44; }
+  .approval-approved { color: var(--green); font-size: 11px; font-weight: 600; }
+  .approval-denied { color: var(--red); font-size: 11px; font-weight: 600; }
+  .approval-acknowledged { color: var(--muted); font-size: 11px; }
+  .approval-pending { color: var(--yellow); font-size: 11px; font-weight: 600; }
+
   .svc-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0;
     border-bottom: 1px solid var(--border); }
   .svc-name { color: var(--text); }
@@ -248,7 +316,7 @@ public sealed class DashboardService : BackgroundService
   <div class="card">
     <div class="card-title">Recent Alerts <span id="alert-count" style="display:none"></span></div>
     <table>
-      <thead><tr><th>Time</th><th>Severity</th><th>Category</th><th>Title</th><th>Message</th></tr></thead>
+      <thead><tr><th>Time</th><th>Severity</th><th>Category</th><th>Title</th><th>Message</th><th>Actions</th></tr></thead>
       <tbody id="alerts"></tbody>
     </table>
   </div>
@@ -345,14 +413,33 @@ function update(d) {
   else ac.style.display='none';
 
   document.getElementById('alerts').innerHTML = d.recentAlerts.length
-    ? d.recentAlerts.slice(0,30).map(a=>`<tr>
-        <td style="white-space:nowrap;color:var(--muted)">${new Date(a.timestamp).toLocaleTimeString()}</td>
-        <td><span class="badge ${badgeClass(a.severity)}">${a.severity}</span></td>
-        <td style="color:var(--muted)">${a.category}</td>
-        <td style="font-weight:600">${a.title}</td>
-        <td class="truncate">${a.message}</td>
-      </tr>`).join('')
-    : '<tr><td colspan="5" class="empty">No alerts yet — system looks clean.</td></tr>';
+    ? d.recentAlerts.slice(0,30).map(a=>{
+        let actions = '';
+        if (a.requiresApproval) {
+          const s = a.approvalState;
+          if (s === 'pending') {
+            actions = `<button class="btn btn-approve" onclick="alertAction('${a.id}','approve')">✅ Approve</button>
+                       <button class="btn btn-deny" onclick="alertAction('${a.id}','deny')" style="margin-left:4px">❌ Deny</button>`;
+          } else if (s === 'approved') {
+            actions = `<span class="approval-approved">✅ Approved</span>`;
+          } else if (s === 'denied') {
+            actions = `<span class="approval-denied">❌ Denied</span>`;
+          } else if (s === 'acknowledged') {
+            actions = `<span class="approval-acknowledged">👁 Acknowledged</span>`;
+          }
+        } else if (!a.requiresApproval && a.approvalState === 'none') {
+          actions = `<button class="btn btn-ack" onclick="alertAction('${a.id}','acknowledge')">👁 Ack</button>`;
+        }
+        return `<tr>
+          <td style="white-space:nowrap;color:var(--muted)">${new Date(a.timestamp).toLocaleTimeString()}</td>
+          <td><span class="badge ${badgeClass(a.severity)}">${a.severity}</span></td>
+          <td style="color:var(--muted)">${a.category}</td>
+          <td style="font-weight:600">${a.title}${a.suggestedAction?`<div style="color:var(--muted);font-size:11px;margin-top:2px">→ ${a.suggestedAction}</div>`:''}</td>
+          <td class="truncate">${a.message}</td>
+          <td style="white-space:nowrap">${actions}</td>
+        </tr>`;
+      }).join('')
+    : '<tr><td colspan="6" class="empty">No alerts yet — system looks clean.</td></tr>';
 
   // Processes
   document.getElementById('procs').innerHTML = d.topProcesses.map(p=>`<tr>
@@ -374,6 +461,13 @@ function update(d) {
     : '<tr><td colspan="3" class="empty">No established connections</td></tr>';
 }
 
+async function alertAction(id, action) {
+  try {
+    const r = await fetch(`/api/alerts/${id}/${action}`, { method: 'POST' });
+    if (r.ok) await poll();
+  } catch { /* ignore */ }
+}
+
 async function poll() {
   try {
     const r = await fetch('/api/status');
@@ -392,7 +486,7 @@ setInterval(poll, 5000);
 </html>
 """;
 
-    // ─── DTO for the status API ───────────────────────────────────────────────
+    // ─── DTOs for the status and alerts APIs ─────────────────────────────────
 
     private sealed class StatusDto
     {
@@ -405,6 +499,19 @@ setInterval(poll, 5000);
         public List<ServiceStatus> Services { get; init; } = [];
         public List<ProcessInfo> TopProcesses { get; init; } = [];
         public List<NetworkConnection> Connections { get; init; } = [];
-        public List<Alert> RecentAlerts { get; init; } = [];
+        public IReadOnlyList<AlertDto> RecentAlerts { get; init; } = [];
+    }
+
+    private sealed class AlertDto
+    {
+        public Guid Id { get; init; }
+        public DateTimeOffset Timestamp { get; init; }
+        public AlertSeverity Severity { get; init; }
+        public AlertCategory Category { get; init; }
+        public string Title { get; init; } = "";
+        public string Message { get; init; } = "";
+        public string? SuggestedAction { get; init; }
+        public bool RequiresApproval { get; init; }
+        public AlertApprovalState ApprovalState { get; init; }
     }
 }

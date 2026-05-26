@@ -74,8 +74,21 @@ public class DashboardOptions
 {
     /// <summary>Whether to serve the local web dashboard.</summary>
     public bool Enabled { get; set; } = true;
-    /// <summary>Port for the embedded HTTP dashboard (localhost only).</summary>
+    /// <summary>Port for the embedded HTTP dashboard.</summary>
     public int Port { get; set; } = 18790;
+    /// <summary>
+    /// Bind address for the dashboard HTTP listener.
+    /// Default: 127.0.0.1 (localhost only — safe default).
+    /// Use 0.0.0.0 to allow access from other machines on your network.
+    /// </summary>
+    public string BindAddress { get; set; } = "127.0.0.1";
+    /// <summary>
+    /// Optional public/LAN URL where this dashboard is reachable from outside the machine.
+    /// Example: http://192.168.1.100:18790
+    /// When set, Discord alerts that require approval will include a direct link to
+    /// the dashboard so you can approve or deny from your phone/browser.
+    /// </summary>
+    public string? ExternalUrl { get; set; }
 }
 
 public class EmailOptions

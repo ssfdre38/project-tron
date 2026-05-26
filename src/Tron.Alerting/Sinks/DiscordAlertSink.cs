@@ -45,6 +45,11 @@ public sealed class DiscordAlertSink : IAlertSink
             return;
         }
 
+        if (!Enum.TryParse<AlertSeverity>(_opts.Alerting.MinSeverity, true, out var minSev))
+            minSev = AlertSeverity.Warning;
+        if (alert.Severity < minSev)
+            return;
+
         var fields = new List<object>
         {
             new { name = "Category", value = alert.Category.ToString(), inline = true },
@@ -55,7 +60,15 @@ public sealed class DiscordAlertSink : IAlertSink
             fields.Add(new { name = "Suggested Action", value = alert.SuggestedAction, inline = false });
 
         if (alert.RequiresApproval)
-            fields.Add(new { name = "Action Required", value = "Reply with **approve** or **deny** to proceed.", inline = false });
+        {
+            var approvalMsg = "⚠️ This alert requires your review.";
+            var externalUrl = _opts.Dashboard.ExternalUrl?.TrimEnd('/');
+            if (!string.IsNullOrWhiteSpace(externalUrl))
+                approvalMsg += $"\n[Open Dashboard]({externalUrl}) — Alert ID: `{alert.Id}`";
+            else
+                approvalMsg += $"\nAlert ID: `{alert.Id}` — Visit the dashboard to approve or deny.";
+            fields.Add(new { name = "Action Required", value = approvalMsg, inline = false });
+        }
 
         if (alert.MitreAttack != null)
             fields.Add(new

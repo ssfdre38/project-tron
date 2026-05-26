@@ -122,7 +122,9 @@ Minimal `appsettings.json` (all sections are optional — Tron works without Dis
 | `Ai` | `Model` | `llama3.2` | Model name to call for alert analysis |
 | `Ai` | `MinSeverityForAnalysis` | `Warning` | Don't call AI for Info-level alerts |
 | `Dashboard` | `Enabled` | `true` | Serve the local web dashboard |
-| `Dashboard` | `Port` | `18790` | Port for `http://localhost:{port}/` |
+| `Dashboard` | `Port` | `18790` | Port for the dashboard HTTP server |
+| `Dashboard` | `BindAddress` | `127.0.0.1` | Bind address. Use `0.0.0.0` to allow LAN access |
+| `Dashboard` | `ExternalUrl` | — | Public/LAN URL of this dashboard (e.g. `http://192.168.1.100:18790`). When set, Discord approval alerts include a deep link |
 
 ## Monitors
 
@@ -249,18 +251,33 @@ The dashboard polls every 5 seconds and shows:
 - **CPU / RAM / Network** gauges with colour-coded thresholds
 - **Disk** usage table (all drives)
 - **Watched services** status (Running / stopped)
-- **Recent alerts** table with severity badges
+- **Recent alerts** table with severity badges, suggested actions, and **approve/deny/acknowledge buttons**
 - **Top 15 processes** by memory
 - **Active TCP connections** (ESTABLISHED only)
 
-Configure the port (or disable it) in `appsettings.json`:
+### Alert approval
+
+Certain high-severity alerts (suspicious processes, new persistence, threat-intel hits, correlation composites)
+require human review. These appear with **⚠️ Action Required** in the Discord embed and show
+**✅ Approve / ❌ Deny** buttons on the dashboard.
+
+Clicking **Approve** or **Deny** records your decision and updates the alert state in the dashboard.
+
+**To receive approval links in Discord**: set `Dashboard.ExternalUrl` to your machine's LAN address:
 
 ```json
 "Dashboard": {
   "Enabled": true,
-  "Port": 18790
+  "Port": 18790,
+  "BindAddress": "0.0.0.0",
+  "ExternalUrl": "http://192.168.1.100:18790"
 }
 ```
+
+Discord embeds will then include a direct link and the alert UUID so you can open the dashboard from your phone.
+
+> **Security note**: `BindAddress: 0.0.0.0` makes the dashboard reachable on your LAN.
+> Do not expose it to the public internet without a reverse proxy and authentication.
 
 
 

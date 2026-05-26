@@ -13,6 +13,7 @@ public sealed class TronStateService
 
     private volatile SystemSnapshot _latest = new();
     private readonly ConcurrentQueue<Alert> _alerts = new();
+    private readonly ConcurrentDictionary<Guid, AlertApprovalState> _approvalStates = new();
     private readonly DateTimeOffset _startedAt = DateTimeOffset.UtcNow;
 
     public SystemSnapshot Latest => _latest;
@@ -28,5 +29,21 @@ public sealed class TronStateService
         // Trim to max window
         while (_alerts.Count > MaxAlerts)
             _alerts.TryDequeue(out _);
+
+        // Pre-populate approval state for alerts that require it
+        if (alert.RequiresApproval)
+            _approvalStates.TryAdd(alert.Id, AlertApprovalState.Pending);
+    }
+
+    public AlertApprovalState GetApprovalState(Guid alertId) =>
+        _approvalStates.GetValueOrDefault(alertId, AlertApprovalState.None);
+
+    public bool SetApprovalState(Guid alertId, AlertApprovalState state)
+    {
+        // Only allow transitioning from a known state
+        if (!_approvalStates.ContainsKey(alertId))
+            return false;
+        _approvalStates[alertId] = state;
+        return true;
     }
 }
