@@ -625,4 +625,5 @@ def write_jsonl(path: Path, records: list) -> None:
 if __name__ == "__main__":
     write_jsonl(HERE / "security_events.jsonl", SECURITY_EVENTS)
     write_jsonl(HERE / "telemetry_snapshots.jsonl", TELEMETRY_SNAPSHOTS)
+    print("Note: process_profiles.jsonl is hand-authored (see datasets/README in custom-model.md).")
     print("Dataset generation complete.")
