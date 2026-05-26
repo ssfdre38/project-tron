@@ -1,26 +1,26 @@
 #!/usr/bin/env python3
 """
-finetune.py — Fine-tune Gemma 4 E2B/E4B on Tron security datasets using Unsloth LoRA.
+finetune.py — Fine-tune Gemma 4 E4B on Tron security datasets using Unsloth LoRA.
 
 Requirements:
-  - CUDA GPU: 12GB+ VRAM for e2b, 24GB+ for e4b
+  - CUDA GPU: 24GB+ VRAM for e4b (use e2b with --base-model google/gemma-4-e2b-it for 12GB)
   - pip install -r requirements.txt
 
 Usage:
-    # Fine-tune e2b (recommended for most hardware):
-    python finetune.py \\
-        --base-model google/gemma-4-e2b-it \\
-        --datasets datasets/security_events_labeled.jsonl datasets/telemetry_snapshots_labeled.jsonl \\
-        --output-dir ./tron-lora-e2b \\
-        --epochs 3
-
-    # Fine-tune e4b (better quality, needs more VRAM):
+    # Fine-tune e4b (default — best reasoning for security analysis):
     python finetune.py \\
         --base-model google/gemma-4-e4b-it \\
         --datasets datasets/security_events_labeled.jsonl datasets/telemetry_snapshots_labeled.jsonl \\
         --output-dir ./tron-lora-e4b \\
+        --epochs 3
+
+    # Fine-tune e2b (lower VRAM alternative, 12GB+):
+    python finetune.py \\
+        --base-model google/gemma-4-e2b-it \\
+        --datasets datasets/security_events_labeled.jsonl datasets/telemetry_snapshots_labeled.jsonl \\
+        --output-dir ./tron-lora-e2b \\
         --epochs 3 \\
-        --lora-rank 32
+        --lora-rank 16
 
 After training, run export_gguf.py to merge and quantize for Ollama.
 """
@@ -64,14 +64,14 @@ def format_chat(example: dict, tokenizer) -> str:
 
 def main():
     parser = argparse.ArgumentParser(description="Fine-tune tron-model with Unsloth LoRA")
-    parser.add_argument("--base-model",  default="google/gemma-4-e2b-it",
+    parser.add_argument("--base-model",  default="google/gemma-4-e4b-it",
                         help="HuggingFace model ID (or local path)")
     parser.add_argument("--datasets",    nargs="+", required=True, type=Path,
                         help="Labeled JSONL training datasets")
     parser.add_argument("--output-dir",  default="./tron-lora", type=Path,
                         help="Directory to save LoRA adapter")
     parser.add_argument("--epochs",      type=int,   default=3,    help="Training epochs")
-    parser.add_argument("--lora-rank",   type=int,   default=16,   help="LoRA rank (16=e2b, 32=e4b)")
+    parser.add_argument("--lora-rank",   type=int,   default=32,   help="LoRA rank (32 for e4b)")
     parser.add_argument("--lora-alpha",  type=int,   default=32,   help="LoRA alpha")
     parser.add_argument("--lr",          type=float, default=2e-4, help="Learning rate")
     parser.add_argument("--batch-size",  type=int,   default=4,    help="Per-device batch size")

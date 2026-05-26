@@ -1,4 +1,4 @@
-FROM C:\Users\admin\gemma4-turbo-family\gemma4-e2b-iq4xs-turbo.gguf
+FROM C:\Users\admin\gemma4-turbo-family\gemma4-e4b-iq4xs-turbo.gguf
 
 TEMPLATE """{{ if .System }}<start_of_turn>system
 {{ .System }}<end_of_turn>
@@ -52,7 +52,7 @@ PARAMETER num_thread 12
 
 LICENSE """Apache License 2.0 — Copyright 2024 Google LLC
 Tron model specialization by ssfdre38, 2026.
-Base: gemma-4-e2b-it (quantized IQ4_XS).
+Base: gemma-4-e4b-it (quantized IQ4_XS).
 TRON™ is a trademark of The Walt Disney Company.
 This project is not affiliated with Disney.
 """

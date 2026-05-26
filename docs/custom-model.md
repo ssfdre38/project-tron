@@ -21,14 +21,15 @@ Tron's model will be:
 ## Target Architecture
 
 ### Base model
-Start from **Gemma 3 4B** or **Llama 3.2 3B** — small enough to inference in real-time
-as alerts come in, large enough to reason well about security context.
+Start from **Gemma 4 E4B** (4B parameters, IQ4_XS quantized) — better reasoning on novel attack
+patterns than E2B while still hitting the <2s alert latency target on most hardware.
 
-**Why a small model?**
+**Why E4B and not larger?**
 - Inference must be fast (< 2 seconds per alert analysis)
-- At 4-bit quantization it fits alongside normal workloads (< 2 GB RAM)
+- At IQ4_XS quantization it fits alongside normal workloads (~3 GB RAM)
 - Security analysis is structured reasoning, not creative generation — smaller models excel here
 - Users should be able to run this on any modern desktop or server
+- Post fine-tune, the specialized weights close the gap to much larger generic models
 
 ### Fine-tuning approach
 **Supervised fine-tuning (SFT)** on:
