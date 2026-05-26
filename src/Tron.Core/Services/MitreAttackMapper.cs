@@ -30,6 +30,14 @@ public static class MitreAttackMapper
     private static readonly MitreAttackInfo T1489     = new("T1489",     "Service Stop",                          "Impact");
     private static readonly MitreAttackInfo T1562_002 = new("T1562.002", "Disable Windows Event Logging",         "Defense Evasion");
     private static readonly MitreAttackInfo T1562     = new("T1562",     "Impair Defenses",                       "Defense Evasion");
+    private static readonly MitreAttackInfo T1565     = new("T1565",     "Data Manipulation",                     "Impact");
+    private static readonly MitreAttackInfo T1070     = new("T1070",     "Indicator Removal",                     "Defense Evasion");
+    private static readonly MitreAttackInfo T1053     = new("T1053",     "Scheduled Task/Job",                    "Execution");
+    private static readonly MitreAttackInfo T1053_005 = new("T1053.005", "Scheduled Task",                        "Execution");
+    private static readonly MitreAttackInfo T1547     = new("T1547",     "Boot or Logon Autostart Execution",     "Persistence");
+    private static readonly MitreAttackInfo T1547_001 = new("T1547.001", "Registry Run Keys / Startup Folder",   "Persistence");
+    private static readonly MitreAttackInfo T1574     = new("T1574",     "Hijack Execution Flow",                 "Persistence");
+    private static readonly MitreAttackInfo T1486     = new("T1486",     "Data Encrypted for Impact",             "Impact");
 
     /// <summary>
     /// Returns the best-matching MITRE ATT&amp;CK technique for the given alert,
@@ -47,6 +55,9 @@ public static class MitreAttackMapper
             AlertCategory.Service     => MapService(combined),
             AlertCategory.ThreatIntel => MapThreatIntel(combined),
             AlertCategory.Cpu or AlertCategory.Memory => MapResourceAbuse(combined),
+            AlertCategory.Integrity   => MapIntegrity(combined),
+            AlertCategory.Persistence => MapPersistence(combined),
+            AlertCategory.Correlation => MapCorrelation(combined),
             _ => null
         };
     }
@@ -117,5 +128,40 @@ public static class MitreAttackMapper
         if (text.Contains("high cpu") || text.Contains("high memory") || text.Contains("runaway") || text.Contains("spike"))
             return T1496;
         return null;
+    }
+
+    private static MitreAttackInfo MapIntegrity(string text)
+    {
+        if (text.Contains("log") || text.Contains("evtx") || text.Contains("audit") || text.Contains("indicator"))
+            return T1070;
+        if (text.Contains("ransom") || text.Contains("encrypt") || text.Contains("multiple file"))
+            return T1486;
+        return T1565;
+    }
+
+    private static MitreAttackInfo MapPersistence(string text)
+    {
+        if (text.Contains("schedule") || text.Contains("task") || text.Contains("cron") || text.Contains("launchd"))
+            return text.Contains("windows") || text.Contains("schtask") ? T1053_005 : T1053;
+        if (text.Contains("run key") || text.Contains("registry") || text.Contains("startup") || text.Contains("autostart"))
+            return T1547_001;
+        if (text.Contains("launchdaemon") || text.Contains("launchagent") || text.Contains("systemd"))
+            return T1547;
+        return T1547;
+    }
+
+    private static MitreAttackInfo MapCorrelation(string text)
+    {
+        if (text.Contains("ransom") || text.Contains("encrypt") || text.Contains("fim"))
+            return T1486;
+        if (text.Contains("lateral") || text.Contains("spread"))
+            return T1021_002;
+        if (text.Contains("c2") || text.Contains("implant") || text.Contains("beacon"))
+            return T1095;
+        if (text.Contains("breach") || text.Contains("intrusion") || text.Contains("compromise"))
+            return T1078;
+        if (text.Contains("persist"))
+            return T1547;
+        return T1071;
     }
 }

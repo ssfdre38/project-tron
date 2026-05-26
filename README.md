@@ -113,6 +113,11 @@ Minimal `appsettings.json` (all sections are optional — Tron works without Dis
 | `ThreatIntel` | `AbuseIpDbMinScore` | `75` | Confidence score threshold (0–100) |
 | `Baseline` | `StorePath` | `tron-baseline.json` | Where to persist learned baseline |
 | `Baseline` | `EnableAnomalyDetection` | `true` | Toggle z-score anomaly monitor |
+| `FileIntegrity` | `Enabled` | `true` | Enable File Integrity Monitor |
+| `FileIntegrity` | `WatchDirectories` | `[]` | Extra directories to hash every cycle |
+| `FileIntegrity` | `WatchFiles` | `[]` | Extra individual files to hash every cycle |
+| `Correlation` | `Enabled` | `true` | Enable the cross-monitor Correlation Engine |
+| `Correlation` | `WindowMinutes` | `5` | Sliding window width for correlation rules |
 | `Ai` | `EndpointUrl` | — | OpenAI-compatible endpoint (Ollama, any local model) |
 | `Ai` | `Model` | `llama3.2` | Model name to call for alert analysis |
 | `Ai` | `MinSeverityForAnalysis` | `Warning` | Don't call AI for Info-level alerts |
@@ -155,11 +160,55 @@ Cross-references every active outbound connection against:
 
 Private IPs (RFC 1918 / loopback / link-local) are always ignored.
 
+### FileIntegrityMonitor
+Tracks SHA-256 hashes of critical OS files and alerts if any change unexpectedly.
+
+**Windows watch list**: `System32\cmd.exe`, `notepad.exe`, `calc.exe`, `certutil.exe`, `wscript.exe`, `mshta.exe`,
+`powershell.exe` (SysWOW64 too), the `hosts` file, and all DLLs in `System32\drivers\etc`.
+
+**Linux watch list**: `/bin/bash`, `/bin/sh`, `/bin/su`, `/usr/bin/sudo`, `/etc/passwd`, `/etc/shadow`,
+`/etc/ssh/sshd_config`, `/etc/crontab`, `/etc/ld.so.preload`.
+
+**macOS watch list**: `/bin/bash`, `/bin/zsh`, `/usr/bin/sudo`, `/etc/hosts`, `/etc/ssh/sshd_config`,
+`/etc/pam.d/sudo`.
+
+Additional directories can be added via `FileIntegrity.WatchDirectories` and specific files via
+`FileIntegrity.WatchFiles`. The first run builds a baseline; subsequent runs compare hashes and alert on
+any changed or newly-appeared file. MITRE: T1565 (Stored Data Manipulation), T1070 (Indicator Removal).
+
+### PersistenceMonitor
+Detects new startup entries across all three major platforms.
+
+**Windows**: scans `System32\Tasks` for new scheduled tasks + HKLM and HKCU `Run`/`RunOnce` registry keys.
+
+**Linux**: scans `/etc/cron*`, `/var/spool/cron`, `/etc/rc.local`, and systemd unit directories
+(`/etc/systemd/system`, `/usr/lib/systemd/system`).
+
+**macOS**: scans `/Library/LaunchDaemons`, `/Library/LaunchAgents`, and `~/Library/LaunchAgents`.
+
+Baseline on first run; alerts on new entries. Also fires an Info alert when entries are removed —
+a sign of an attacker covering their tracks. MITRE: T1053 (Scheduled Task/Job), T1547 (Boot/Logon Autostart).
+
+### CorrelationEngine
+After all monitors run each cycle, the engine applies five sliding-window rules that detect multi-stage attacks:
+
+| Rule | Triggers when… |
+|---|---|
+| **Active Breach** | Auth failures + suspicious process + external C2 connection all within the window |
+| **C2 Implant** | Suspicious process + external network connection from unexpected process |
+| **Malware Install** | Persistence alert + suspicious process alert within the window |
+| **Lateral Movement** | Auth failures + SMB/RDP/WinRM connection from an internal IP |
+| **Ransomware Signal** | Multiple FIM changes + service-stopped alert + Shadow Copy deletion (vssadmin) |
+
+Window defaults to 5 minutes, configurable via `Correlation.WindowMinutes`. Per-rule cooldown = 5× the
+window to avoid repeated firing on the same event cluster.
+
 ### MITRE ATT&CK tagging
 Every alert is automatically mapped to the closest [MITRE ATT&CK](https://attack.mitre.org) technique.
 The technique ID, name, tactic, and direct URL appear in Discord embeds, email alerts, and webhook payloads.
 Coverage includes: T1110 (Brute Force), T1046 (Network Scanning), T1059 (Scripting), T1496 (Resource Hijacking),
-T1489 (Service Stop), T1562 (Defence Evasion), and ~15 others.
+T1489 (Service Stop), T1562 (Defence Evasion), T1565 (Data Manipulation), T1053 (Scheduled Task),
+T1547 (Autostart), T1486 (Ransomware), and ~20 others.
 
 ### Alert sinks — all optional, all independent
 | Sink | Description |

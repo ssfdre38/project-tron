@@ -15,6 +15,8 @@ public class TronOptions
     public EmailOptions Email { get; set; } = new();
     public WebhookOptions Webhook { get; set; } = new();
     public ThreatIntelOptions ThreatIntel { get; set; } = new();
+    public FileIntegrityOptions FileIntegrity { get; set; } = new();
+    public CorrelationOptions Correlation { get; set; } = new();
 }
 
 public class ThresholdOptions
@@ -125,5 +127,29 @@ public class ThreatIntelOptions
     public int AbuseIpDbMinScore { get; set; } = 75;
     /// <summary>Cache AbuseIPDB results for this many minutes (reduces API usage).</summary>
     public int AbuseIpDbCacheDurationMinutes { get; set; } = 1440;
+}
+
+public class FileIntegrityOptions
+{
+    /// <summary>Enable File Integrity Monitoring. Hashes critical system files on first run, alerts on change.</summary>
+    public bool Enabled { get; set; } = true;
+    /// <summary>
+    /// Additional directories to watch recursively (beyond built-in critical-file lists).
+    /// Example: ["/etc/nginx/", "C:\\inetpub\\wwwroot"]
+    /// </summary>
+    public List<string> WatchDirectories { get; set; } = [];
+    /// <summary>Additional individual files to monitor (full paths).</summary>
+    public List<string> WatchFiles { get; set; } = [];
+}
+
+public class CorrelationOptions
+{
+    /// <summary>Enable the cross-monitor correlation engine.</summary>
+    public bool Enabled { get; set; } = true;
+    /// <summary>
+    /// Sliding window in minutes. Alerts from different monitors that fall within this
+    /// window are evaluated as a group against correlation rules.
+    /// </summary>
+    public int WindowMinutes { get; set; } = 5;
 }
 

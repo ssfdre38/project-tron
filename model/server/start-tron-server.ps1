@@ -45,7 +45,7 @@ param(
     [int]$Port          = 11435,
     [int]$Threads       = 0,
     [string]$BindHost   = "127.0.0.1",
-    [int]$CtxSize       = 8192,
+    [int]$CtxSize       = 32768,
     [switch]$FlashAttn  = $true,
     [switch]$Verbose    = $false
 )

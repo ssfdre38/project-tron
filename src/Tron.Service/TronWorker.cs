@@ -13,6 +13,7 @@ public sealed class TronWorker : BackgroundService
     private readonly IEnumerable<IMonitor> _monitors;
     private readonly IEnumerable<IAlertSink> _sinks;
     private readonly IAiAnalyzer _analyzer;
+    private readonly CorrelationEngine _correlation;
     private readonly TronOptions _opts;
     private readonly ILogger<TronWorker> _log;
 
@@ -26,6 +27,7 @@ public sealed class TronWorker : BackgroundService
         IEnumerable<IMonitor> monitors,
         IEnumerable<IAlertSink> sinks,
         IAiAnalyzer analyzer,
+        CorrelationEngine correlation,
         TronStateService stateService,
         IOptions<TronOptions> opts,
         ILogger<TronWorker> log)
@@ -34,6 +36,7 @@ public sealed class TronWorker : BackgroundService
         _monitors = monitors;
         _sinks = sinks;
         _analyzer = analyzer;
+        _correlation = correlation;
         _stateService = stateService;
         _opts = opts.Value;
         _log = log;
@@ -78,6 +81,10 @@ public sealed class TronWorker : BackgroundService
                             allAlerts[i] = allAlerts[i] with { MitreAttack = mapped };
                     }
                 }
+
+                // Feed all alerts into the correlation engine — may produce composite alerts
+                var correlationAlerts = _correlation.Correlate(allAlerts);
+                allAlerts.AddRange(correlationAlerts);
 
                 // Run AI analysis on the batch if there are any significant alerts
                 var significantAlerts = allAlerts

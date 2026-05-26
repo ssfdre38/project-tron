@@ -2,6 +2,7 @@ using Tron.Alerting.Analyzers;
 using Tron.Alerting.Sinks;
 using Tron.Core.Config;
 using Tron.Core.Interfaces;
+using Tron.Core.Services;
 using Tron.Monitors;
 using Tron.Monitors.Collectors;
 using Tron.Monitors.Monitors;
@@ -39,6 +40,11 @@ builder.Services.AddSingleton<IMonitor, SecurityEventMonitor>();
 builder.Services.AddSingleton<IMonitor, BaselineMonitor>();
 builder.Services.AddHttpClient<ThreatIntelMonitor>();
 builder.Services.AddSingleton<IMonitor, ThreatIntelMonitor>();
+builder.Services.AddSingleton<IMonitor, FileIntegrityMonitor>();
+builder.Services.AddSingleton<IMonitor, PersistenceMonitor>();
+
+// Correlation engine (cross-monitor composite alert rules)
+builder.Services.AddSingleton<CorrelationEngine>();
 
 // Alert sinks
 builder.Services.AddHttpClient<DiscordAlertSink>();

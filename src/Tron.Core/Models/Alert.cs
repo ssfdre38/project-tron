@@ -36,5 +36,11 @@ public enum AlertCategory
     Process,
     Security,
     Agent,
-    ThreatIntel
+    ThreatIntel,
+    /// <summary>File Integrity Monitor — hash change on a critical system file.</summary>
+    Integrity,
+    /// <summary>Persistence mechanism detected — new scheduled task, registry run key, cron job, or LaunchDaemon.</summary>
+    Persistence,
+    /// <summary>Cross-monitor correlation — composite alert from multiple related events within a short window.</summary>
+    Correlation
 }
